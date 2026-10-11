@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Sprite-Sheet-Generator EA 1</title>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+// Erzeugt die beiden Sprite-Sheets (Scheibe, Hase) per Canvas-2D und gibt sie als Data-URL (PNG bzw. WebP) aus.
+// Aufruf: sprites.html?sheet=disc  bzw.  sprites.html?sheet=bunny  (siehe tools/build-sprites.mjs)
+
+const SHEETS = {
+  disc:  { frames: 36, cols: 6, rows: 6, size: 420, type: "image/webp", quality: 0.9 },
+  bunny: { frames: 24, cols: 6, rows: 4, size: 360, type: "image/png" }
+};
+
+const DEG = Math.PI / 180;
+
+function drawDisc(ctx, S, k, n) {
+  const c = S / 2;
+  const R = S * 0.44;
+  const angle = (k / n) * 2 * Math.PI; // Rotationszustand dieses Einzelbilds (im Uhrzeigersinn)
+
+  // feststehender Schatten (rotationssymmetrisch, dreht sich nicht mit)
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.30)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 7;
+  ctx.fillStyle = "#1c1c1c";
+  ctx.beginPath(); ctx.arc(c, c, R, 0, 2 * Math.PI); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(c, c);
+  ctx.rotate(angle);
+
+  // Außenring (Metallrand)
+  const rim = ctx.createRadialGradient(0, 0, R * 0.9, 0, 0, R);
+  rim.addColorStop(0, "#5a5a5a"); rim.addColorStop(0.5, "#2c2c2c"); rim.addColorStop(1, "#111");
+  ctx.fillStyle = rim;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, 2 * Math.PI); ctx.fill();
+
+  // Graustufenring: Verlauf von Schwarz nach Weiß mit harter Kante, daher an jeder Stelle eindeutig
+  const ringOuter = R - 14, ringInner = R * 0.74;
+  const conic = ctx.createConicGradient(-Math.PI / 2, 0, 0);
+  conic.addColorStop(0, "#161616"); conic.addColorStop(1, "#f4f4f4");
+  ctx.strokeStyle = conic;
+  ctx.lineWidth = ringOuter - ringInner;
+  ctx.beginPath(); ctx.arc(0, 0, (ringOuter + ringInner) / 2, 0, 2 * Math.PI); ctx.stroke();
+
+  // Innenscheibe
+  const inner = ctx.createRadialGradient(0, 0, 0, 0, 0, ringInner);
+  inner.addColorStop(0, "#2b2b2b"); inner.addColorStop(1, "#0a0a0a");
+  ctx.fillStyle = inner;
+  ctx.beginPath(); ctx.arc(0, 0, ringInner, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = "#c4c4c4"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, ringInner, 0, 2 * Math.PI); ctx.stroke();
+
+  // fünf Spiralblätter
+  const blade = ctx.createRadialGradient(0, 0, ringInner * 0.15, 0, 0, ringInner);
+  blade.addColorStop(0, "rgba(255,255,255,0.95)"); blade.addColorStop(1, "rgba(190,190,190,0.8)");
+  ctx.fillStyle = blade;
+  for (let i = 0; i < 5; i++) {
+    const base = -Math.PI / 2 + i * 72 * DEG;
+    ctx.beginPath();
+    const steps = 24;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const a = base + t * 85 * DEG;
+      const r = ringInner * (0.16 + t * 0.78);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    for (let s = steps; s >= 0; s--) {
+      const t = s / steps;
+      const w = (30 * (1 - t) + 4) * DEG;
+      const a = base + t * 85 * DEG - w;
+      const r = ringInner * (0.16 + t * 0.78);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+
+  // unregelmäßige Punkte: machen kleine Drehwinkel auch im Zentrum sichtbar
+  const dots = [[0.52, 200, "#ffffff"], [0.40, 95, "#8c8c8c"], [0.64, 322, "#d0d0d0"]];
+  for (const [rf, deg, col] of dots) {
+    const a = (deg - 90) * DEG, r = ringInner * rf;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, S * 0.017, 0, 2 * Math.PI); ctx.fill();
+  }
+
+  // Zeigerdreieck bei 0° (oben) und zwei Randmarken in ungleichen Abständen
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.moveTo(0, -R + 1); ctx.lineTo(-S * 0.03, -R + 15); ctx.lineTo(S * 0.03, -R + 15); ctx.closePath(); ctx.fill();
+  for (const deg of [118, 241]) {
+    const a = (deg - 90) * DEG;
+    ctx.fillStyle = "#e8e8e8";
+    ctx.beginPath(); ctx.arc(Math.cos(a) * (R - 5), Math.sin(a) * (R - 5), 3.2, 0, 2 * Math.PI); ctx.fill();
+  }
+
+  // Nabe
+  const hub = ctx.createRadialGradient(-4, -4, 1, 0, 0, R * 0.16);
+  hub.addColorStop(0, "#ffffff"); hub.addColorStop(0.6, "#c9c9c9"); hub.addColorStop(1, "#6e6e6e");
+  ctx.fillStyle = hub;
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.15, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "#0a0a0a";
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.045, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "#0a0a0a";
+  ctx.beginPath(); ctx.arc(R * 0.095, 0, 3, 0, 2 * Math.PI); ctx.fill();
+
+  ctx.restore();
+
+  // feststehender Glanz (Lichtreflex dreht nicht mit)
+  ctx.save();
+  ctx.beginPath(); ctx.arc(c, c, R, 0, 2 * Math.PI); ctx.clip();
+  const gl = ctx.createLinearGradient(c - R * 0.8, c - R * 0.8, c + R * 0.25, c + R * 0.25);
+  gl.addColorStop(0, "rgba(255,255,255,0.36)");
+  gl.addColorStop(0.55, "rgba(255,255,255,0.07)");
+  gl.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gl; ctx.fillRect(0, 0, S, S);
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(c, c, R - 3, 200 * DEG, 262 * DEG); ctx.stroke();
+  ctx.restore();
+}
+
+function bump(t, mu, sigma) {
+  const d = Math.min(Math.abs(t - mu), 1 - Math.abs(t - mu));
+  return Math.exp(-((d / sigma) ** 2));
+}
+function hopHeight(t) {
+  if (t < 0.2 || t > 0.8) return 0;
+  const u = (t - 0.2) / 0.6;
+  return 4 * u * (1 - u);
+}
+
+function drawBunny(ctx, S, k, n) {
+  const t = k / n;
+  const ground = S * 0.88;
+  const H = S * 0.27;
+  const h = hopHeight(t) * H;
+  const eps = 0.01;
+  const vy = (hopHeight(t + eps) - hopHeight(t - eps)) / (2 * eps); // >0 beim Aufstieg
+  const crouch = 0.22 * bump(t, 0.12, 0.06) + 0.24 * bump(t, 0.865, 0.05);
+  const stretch = 0.16 * bump(t, 0.25, 0.045) + 0.07 * bump(t, 0.76, 0.05);
+  const sx = 1 + 0.6 * crouch - 0.55 * stretch;
+  const sy = 1 - crouch + stretch;
+  const flop = Math.max(-1, Math.min(1, vy / 2.4)); // Ohren hängen nach hinten beim Aufstieg
+
+  // Bodenschatten (bleibt am Boden, schrumpft mit der Höhe)
+  const sh = 1 - 0.45 * (h / H);
+  ctx.fillStyle = `rgba(0,0,0,${0.22 * sh})`;
+  ctx.beginPath(); ctx.ellipse(S * 0.46, ground + 4, S * 0.24 * sh, S * 0.032 * sh, 0, 0, 2 * Math.PI); ctx.fill();
+
+  ctx.save();
+  ctx.translate(S * 0.46, ground - h);
+  ctx.scale(S / 360 * sx, S / 360 * sy);
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  const line = "#2b2b2b", fur = "#efe7dc", furShade = "#d8cdbd", pink = "#f2a1b3";
+  const stroke = (w = 4) => { ctx.lineWidth = w; ctx.strokeStyle = line; ctx.stroke(); };
+
+  // hinteres Ohr
+  const ear = (ox, oy, rot, shade) => {
+    ctx.save(); ctx.translate(ox, oy); ctx.rotate(rot);
+    ctx.fillStyle = shade ? furShade : fur;
+    ctx.beginPath(); ctx.ellipse(0, -44, 13, 46, 0, 0, 2 * Math.PI); ctx.fill(); stroke();
+    ctx.fillStyle = pink;
+    ctx.beginPath(); ctx.ellipse(0, -40, 6.5, 33, 0, 0, 2 * Math.PI); ctx.fill();
+    ctx.restore();
+  };
+  const earFlop = -flop * 28 * DEG;
+  ear(38, -122, -12 * DEG + earFlop * 0.8, true);
+
+  // Schwanz
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-78, -50, 17, 0, 2 * Math.PI); ctx.fill(); stroke();
+
+  // Körper
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(-8, -62, 64, 47, -0.06, 0, 2 * Math.PI); ctx.fill(); stroke();
+  ctx.fillStyle = "#fbf7f1";
+  ctx.beginPath(); ctx.ellipse(8, -50, 36, 26, 0, 0, 2 * Math.PI); ctx.fill();
+
+  // Hinterlauf
+  ctx.fillStyle = furShade;
+  ctx.beginPath(); ctx.ellipse(-34, -48, 31, 29, 0.2, 0, 2 * Math.PI); ctx.fill(); stroke();
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(-8, -12, 38, 12, 0, 0, 2 * Math.PI); ctx.fill(); stroke();
+
+  // Vorderpfote
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(40, -14, 15, 11, 0, 0, 2 * Math.PI); ctx.fill(); stroke();
+
+  // Kopf
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.arc(46, -98, 35, 0, 2 * Math.PI); ctx.fill(); stroke();
+  // vorderes Ohr
+  ear(58, -124, 8 * DEG + earFlop, false);
+  // Wange
+  ctx.fillStyle = "rgba(242,161,179,0.55)";
+  ctx.beginPath(); ctx.ellipse(54, -86, 10, 7, 0, 0, 2 * Math.PI); ctx.fill();
+  // Auge
+  ctx.fillStyle = line;
+  ctx.beginPath(); ctx.arc(58, -106, 5.5, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(60, -108, 1.8, 0, 2 * Math.PI); ctx.fill();
+  // Nase und Mund
+  ctx.fillStyle = pink;
+  ctx.beginPath(); ctx.ellipse(80, -98, 6, 4.5, 0, 0, 2 * Math.PI); ctx.fill(); stroke(2.5);
+  ctx.beginPath(); ctx.moveTo(80, -93); ctx.lineTo(76, -86); ctx.moveTo(76, -86); ctx.quadraticCurveTo(70, -82, 64, -86); stroke(2.5);
+  // Schnurrhaare
+  ctx.beginPath(); ctx.moveTo(72, -92); ctx.lineTo(96, -96); ctx.moveTo(72, -88); ctx.lineTo(96, -86); stroke(2);
+
+  ctx.restore();
+}
+
+function render(name) {
+  const cfg = SHEETS[name];
+  const canvas = document.createElement("canvas");
+  canvas.width = cfg.cols * cfg.size;
+  canvas.height = cfg.rows * cfg.size;
+  const ctx = canvas.getContext("2d");
+  for (let k = 0; k < cfg.frames; k++) {
+    const col = k % cfg.cols, row = Math.floor(k / cfg.cols);
+    ctx.save();
+    ctx.translate(col * cfg.size, row * cfg.size);
+    ctx.beginPath(); ctx.rect(0, 0, cfg.size, cfg.size); ctx.clip();
+    (name === "disc" ? drawDisc : drawBunny)(ctx, cfg.size, k, cfg.frames);
+    ctx.restore();
+  }
+  return canvas.toDataURL(cfg.type, cfg.quality);
+}
+
+const name = new URLSearchParams(location.search).get("sheet");
+document.getElementById("out").textContent = SHEETS[name] ? render(name) : "unknown sheet";
+</script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:,">
+<title>EA 1: Interaktiv animierte Scheibe</title>
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --soft: #f5f5f5;
+    --primary: #1a1a1a;
+    --primary-dark: #000000;
+    --primary-light: #ededed;
+    --accent: #2a2a2a;
+    --success: #2e7d32;
+    --success-bg: #e8f5e9;
+    --error: #c62828;
+    --error-bg: #ffebee;
+    --warn: #ef6c00;
+    --warn-bg: #fff3e0;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --border: #d4d4d4;
+    --border-strong: #1a1a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 6px rgba(0,0,0,.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  header {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 2.5rem 1.5rem 2rem;
+    border-bottom: 1px solid #000;
+  }
+  header .wrap { max-width: 1080px; margin: 0 auto; }
+  header h1 { margin: 0 0 .35rem; font-size: 1.85rem; font-weight: 600; }
+  header p { margin: 0; opacity: .92; font-size: 1rem; }
+  header .meta {
+    margin-top: 1rem; font-size: .85rem; opacity: .75;
+    display: flex; flex-wrap: wrap; gap: .25rem 1rem;
+  }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  section { margin-bottom: 3rem; }
+
+  h2 {
+    font-size: 1.35rem; margin: 0 0 1rem;
+    padding-bottom: .5rem; border-bottom: 1px solid var(--border);
+  }
+  h2 .num {
+    display: inline-block; background: #1a1a1a; color: #fff;
+    border-radius: 2px; padding: .15rem .55rem; margin-right: .55rem;
+    font-size: .85rem; vertical-align: middle; letter-spacing: .03em;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid #1a1a1a;
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    padding: 1rem 1.1rem 1.1rem;
+    margin-bottom: 1.25rem;
+  }
+  .card h4 { margin: 0 0 .35rem; font-size: .95rem; font-weight: 600; }
+  .card .sub { font-size: .82rem; color: var(--text-muted); margin: 0 0 .65rem; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  .btn {
+    display: inline-block; padding: .5rem 1rem;
+    background: #1a1a1a; color: #fff;
+    border: 1px solid #1a1a1a; border-radius: 2px;
+    font-size: .9rem; font-weight: 500; cursor: pointer;
+    transition: background .15s, color .15s;
+    font-family: inherit;
+  }
+  .btn:hover, .btn.is-pressed { background: #fff; color: #1a1a1a; }
+  .btn:focus-visible { outline: 2px solid #1a1a1a; outline-offset: 2px; }
+  .btn:disabled { background: #fff; color: var(--text-muted); border-color: var(--border); cursor: not-allowed; }
+  .btn.secondary { background: #fff; color: #1a1a1a; }
+  .btn.secondary:hover, .btn.secondary.is-pressed { background: #1a1a1a; color: #fff; }
+  .btn kbd { margin-left: .35rem; }
+
+  .global-status {
+    background: var(--soft); color: var(--text);
+    border-left: 3px solid #1a1a1a;
+    padding: .65rem 1rem; border-radius: 0;
+    font-size: .9rem; margin-bottom: 1.25rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .global-status.is-ready { background: var(--success-bg); border-left-color: var(--success); }
+  .global-status.is-error { background: var(--error-bg); border-left-color: var(--error); color: var(--error); }
+  .global-status.is-warn  { background: var(--warn-bg);  border-left-color: var(--warn); }
+
+  .statline {
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; margin: 0 0 1rem;
+    font-size: .9rem; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .statline b { font-weight: 600; }
+
+  /* Bühne für ein Sprite: <img> mit Sprite-Sheet, sichtbar ist nur ein Einzelbild */
+  .stage {
+    display: flex; justify-content: center;
+    background: var(--soft); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1.25rem; margin-bottom: 1rem;
+  }
+  .sprite {
+    position: relative; overflow: hidden;
+    width: min(280px, 100%); aspect-ratio: 1 / 1;
+  }
+  .sprite img {
+    position: absolute; top: 0; left: 0; display: block;
+    max-width: none; height: auto;
+    user-select: none; -webkit-user-drag: none; pointer-events: none;
+    will-change: transform; visibility: hidden;
+  }
+  .sprite.is-loaded img { visibility: visible; }
+  .sprite.bunny { width: min(240px, 100%); }
+  .sprite.is-failed::after {
+    content: "Bild nicht verfügbar"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--error); font-size: .9rem;
+  }
+
+  .prose { max-width: 740px; }
+  .prose p { margin: 0 0 .75rem; }
+  .prose ul { padding-left: 1.4rem; margin: 0 0 1rem; }
+  .prose li { margin-bottom: .35rem; }
+  .prose a { color: #1a1a1a; text-decoration-thickness: 1px; }
+  .prose a:hover { text-decoration-thickness: 2px; }
+  .prose code { background: var(--soft); padding: 0 .3rem; border-radius: 3px; font-size: .9em; }
+
+  table.key-table { border-collapse: collapse; margin: .5rem 0 1rem; font-size: .9rem; width: 100%; }
+  table.key-table th, table.key-table td { border: 1px solid var(--border); padding: .4rem .7rem; text-align: left; }
+  table.key-table th { background: var(--soft); font-weight: 600; }
+  table.key-table td:first-child { white-space: nowrap; width: 1%; }
+
+  kbd {
+    display: inline-block; padding: .05rem .35rem; background: var(--soft);
+    border: 1px solid var(--border); border-radius: 3px; font-size: .78rem; color: var(--text);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  footer { border-top: 1px solid var(--border); padding-top: 1.5rem; font-size: .85rem; color: var(--text-muted); }
+
+  @media (max-width: 720px) {
+    header h1 { font-size: 1.5rem; }
+    main { padding: 1.5rem 1rem 3rem; }
+  }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+  /* Kontextsensitive Hilfe (ISO 9241-110) */
+  .help { position: relative; display: inline-block; margin-left: .5rem; vertical-align: middle; }
+  .help-btn {
+    width: 1.4rem; height: 1.4rem; padding: 0;
+    border: 1px solid var(--border-strong); background: #fff; color: var(--text);
+    border-radius: 50%; font-size: .8rem; font-weight: 600; cursor: help; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .help-btn:hover, .help-btn:focus-visible { background: var(--text); color: #fff; outline: none; }
+  .help-popover {
+    display: none; position: absolute; top: calc(100% + .35rem); left: 50%; transform: translateX(-50%);
+    width: min(360px, 80vw); background: #fff; color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    padding: .7rem .85rem; font-size: .85rem; line-height: 1.45;
+    box-shadow: var(--shadow-lg); z-index: 10; text-align: left; font-weight: normal;
+  }
+  .help-popover::before {
+    content: ""; position: absolute; top: -7px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 12px; height: 12px; background: #fff;
+    border-left: 1px solid var(--border-strong); border-top: 1px solid var(--border-strong);
+  }
+  .help.is-open .help-popover { display: block; }
+  .help-popover h4 { margin: 0 0 .35rem; font-size: .9rem; font-weight: 600; }
+  .help-popover p { margin: 0 0 .35rem; }
+  .help-popover p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>EA 1: Interaktiv animierte Scheibe</h1>
+    <p>Eine sich drehende 2D-Scheibe aus Einzelbildern (Sprite-Sheet), per JavaScript geladen und in einem <code>&lt;img&gt;</code>-Element dargestellt. Steuerung über die Tasten l, r und a.</p>
+    <div class="meta">
+      <span>Hamid Mergan</span>
+      <span>TH Lübeck</span>
+      <span>Modul Graphical Visualisation Technologies</span>
+      <span>Wintersemester 2026/27</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div id="globalStatus" class="global-status" role="status" aria-live="polite">Lade Bildmaterial …</div>
+
+  <!-- A1 Scheibe -->
+  <section aria-labelledby="a1">
+    <h2 id="a1"><span class="num">A1</span>Interaktive Scheibe
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A1" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>So drehst du die Scheibe</h4>
+          <p><kbd>l</kbd> dreht die Scheibe um ein Bild nach links, <kbd>r</kbd> um ein Bild nach rechts. Pro Tastendruck genau ein Schritt.</p>
+          <p><kbd>a</kbd> startet die kontinuierliche Drehung nach rechts und hält sie bei erneutem Drücken wieder an. Alle drei Funktionen gibt es auch als Buttons.</p>
+        </span>
+      </span>
+    </h2>
+
+    <div class="card">
+      <h4>Scheibe</h4>
+      <p class="sub">36 Einzelbilder im Abstand von 10°, geladen aus einem Sprite-Sheet.</p>
+      <div class="stage">
+        <div class="sprite" id="discSprite">
+          <img id="discImg" alt="Drehende schwarz-weiße Scheibe mit Spirale" draggable="false">
+        </div>
+      </div>
+      <div class="statline" aria-label="Zustand der Scheibe">
+        <span><b>Bild:</b> <span id="infoFrame">…</span></span>
+        <span><b>Drehwinkel:</b> <span id="infoAngle">…</span></span>
+        <span><b>Auto-Rotation:</b> <span id="infoAuto">aus</span></span>
+      </div>
+      <div class="toolbar">
+        <button id="btnLeft" class="btn secondary" type="button" disabled>◀ Links<kbd>l</kbd></button>
+        <button id="btnRight" class="btn secondary" type="button" disabled>Rechts ▶<kbd>r</kbd></button>
+        <button id="btnAuto" class="btn" type="button" disabled><span id="btnAutoLabel">Auto-Rotation starten</span><kbd>a</kbd></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- A2 Hase -->
+  <section aria-labelledby="a2">
+    <h2 id="a2"><span class="num">A2</span>Zweites Objekt: Hüpfender Hase
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A2" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>Erweiterung 1</h4>
+          <p>Der Hase ist ein weiteres, selbst erstelltes Sprite-Sheet mit 24 Bildern (Ducken, Absprung, Flug, Landung) und läuft dauerhaft in einer Schleife. Mit dem Button lässt er sich anhalten und wieder starten.</p>
+        </span>
+      </span>
+    </h2>
+    <div class="card">
+      <h4>Hase</h4>
+      <p class="sub">24 Einzelbilder, 24 Bilder pro Sekunde, Dauerschleife.</p>
+      <div class="stage">
+        <div class="sprite bunny" id="bunnySprite">
+          <img id="bunnyImg" alt="Hüpfender Hase" draggable="false">
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="btnBunny" class="btn secondary" type="button" disabled><span id="btnBunnyLabel">Hase anhalten</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- A3 Bedienung -->
+  <section aria-labelledby="a3">
+    <h2 id="a3"><span class="num">A3</span>Bedienung
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A3" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>Tastatur oder Maus</h4>
+          <p>Jede Taste hat einen gleichnamigen Button. Beim Tastendruck leuchtet der zugehörige Button kurz auf.</p>
+        </span>
+      </span>
+    </h2>
+    <table class="key-table">
+      <thead><tr><th>Taste</th><th>Wirkung</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>l</kbd></td><td>Scheibe ein Bild (10°) nach links drehen</td></tr>
+        <tr><td><kbd>r</kbd></td><td>Scheibe ein Bild (10°) nach rechts drehen</td></tr>
+        <tr><td><kbd>a</kbd></td><td>Auto-Rotation (nach rechts) starten bzw. anhalten (Erweiterung 2)</td></tr>
+      </tbody>
+    </table>
+    <div class="prose">
+      <p>Zum Weiterdrehen muss die Taste <code>l</code> oder <code>r</code> wiederholt gedrückt werden. Gedrückthalten löst keinen Dauerlauf aus. Tastenkombinationen mit Strg, Cmd oder Alt (z. B. Cmd+R zum Neuladen) werden nicht abgefangen.</p>
+      <p>Umsetzung der Interaktionsprinzipien (ISO 9241-110) und der Gebrauchstauglichkeit (ISO 9241-11):</p>
+      <ul>
+        <li><b>Aufgabenangemessenheit:</b> Die drei nötigen Funktionen gibt es als Taste und als Button, mehr nicht.</li>
+        <li><b>Selbstbeschreibungsfähigkeit:</b> Die Statuszeile zeigt Bild, Drehwinkel und Auto-Zustand. Die Buttons nennen ihre Taste, und an jedem Abschnitt erklärt eine (?)-Hilfe die Bedienung.</li>
+        <li><b>Erwartungskonformität:</b> <code>l</code> dreht nach links, <code>r</code> nach rechts, Browser-Kürzel wie Cmd+R bleiben unberührt.</li>
+        <li><b>Steuerbarkeit:</b> Auto-Rotation und Hasenanimation lassen sich jederzeit anhalten und wieder starten.</li>
+        <li><b>Fehlertoleranz:</b> Gedrückthalten löst keinen Dauerlauf aus. Fehlen Bilder, erscheint eine Fehlermeldung und die Bedienelemente werden gesperrt.</li>
+        <li><b>Lernförderlichkeit:</b> Tastenübersicht und Hilfetexte stehen direkt an der Stelle der Bedienung.</li>
+        <li><b>Gebrauchstauglichkeit:</b> Jede Funktion ist mit einem Tastendruck oder Klick erreichbar, die Seite ist auch auf dem Handy bedienbar, und der Tastaturfokus ist sichtbar.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- A4 Material -->
+  <section aria-labelledby="a4">
+    <h2 id="a4"><span class="num">A4</span>Material &amp; Quellen</h2>
+    <div class="prose">
+      <ul>
+        <li><b>Scheibe:</b> selbst erstellt. Sprite-Sheet <code>textures/disc.webp</code> mit 36 Einzelbildern (0°, 10°, 20° … 350°). Mit einem eigenen Skript (<code>tools/sprites.html</code>) einmalig gezeichnet und als Datei gespeichert. Die Seite selbst lädt nur die fertigen Bilddateien.</li>
+        <li><b>Hase:</b> selbst erstellt. Sprite-Sheet <code>textures/bunny.png</code> mit 24 Einzelbildern. Mit demselben Skript erstellt.</li>
+        <li><b>Fremdmaterial:</b> keines. Es werden keine externen Bibliotheken, Schriften oder Bilder verwendet.</li>
+        <li><b>Technik:</b> reines HTML, CSS und JavaScript. Die Bilder werden mit <code>new Image()</code> geladen und im <code>&lt;img&gt;</code>-Element gezeigt (kein Canvas, kein WebGL). Der sichtbare Bildausschnitt wird über <code>overflow: hidden</code> und eine CSS-<code>transform</code>-Verschiebung des Sprite-Sheets gewählt.</li>
+        <li><b>Quelltext:</b> die für diese Aufgabe geschriebenen Stellen sind mit <code>// START EA1_INTERAKTIV_ANIMIERTE_SCHEIBE</code> und <code>// END EA1_INTERAKTIV_ANIMIERTE_SCHEIBE</code> markiert.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p>Die Seite läuft vollständig im Browser. Es werden keine Daten an einen Server gesendet und nichts gespeichert. Die beiden Sprite-Sheets werden statisch aus <code>textures/</code> geladen.</p>
+  </footer>
+</main>
+
+<script>
+// START EA1_INTERAKTIV_ANIMIERTE_SCHEIBE
+(function () {
+  "use strict";
+
+  // Sprite-Sheets: Einzelbilder zeilenweise von links oben nach rechts unten
+  const DISC  = { src: "textures/disc.webp",  cols: 6, rows: 6, frames: 36, fps: 30, spriteEl: "discSprite",  imgEl: "discImg" };
+  const BUNNY = { src: "textures/bunny.png", cols: 6, rows: 4, frames: 24, fps: 24, spriteEl: "bunnySprite", imgEl: "bunnyImg" };
+
+  const statusEl = document.getElementById("globalStatus");
+  const infoFrame = document.getElementById("infoFrame");
+  const infoAngle = document.getElementById("infoAngle");
+  const infoAuto = document.getElementById("infoAuto");
+  const btnLeft = document.getElementById("btnLeft");
+  const btnRight = document.getElementById("btnRight");
+  const btnAuto = document.getElementById("btnAuto");
+  const btnAutoLabel = document.getElementById("btnAutoLabel");
+  const btnBunny = document.getElementById("btnBunny");
+  const btnBunnyLabel = document.getElementById("btnBunnyLabel");
+
+  let autoRotation = false;
+
+  for (const s of [DISC, BUNNY]) {
+    s.sprite = document.getElementById(s.spriteEl);
+    s.img = document.getElementById(s.imgEl);
+    s.img.style.width = s.cols * 100 + "%";
+    s.index = 0;
+    s.acc = 0;
+    s.ready = false;
+    s.paused = false;
+  }
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text;
+    statusEl.className = "global-status" + (kind ? " is-" + kind : "");
+  }
+
+  // zeigt Einzelbild i: verschiebt das Sprite-Sheet so, dass nur dieses Bild im Rahmen liegt
+  function showFrame(s, i) {
+    s.index = ((i % s.frames) + s.frames) % s.frames;
+    const col = s.index % s.cols;
+    const row = Math.floor(s.index / s.cols);
+    s.img.style.transform = "translate(" + (-col * 100 / s.cols) + "%, " + (-row * 100 / s.rows) + "%)";
+  }
+
+  function updateInfo() {
+    infoFrame.textContent = (DISC.index + 1) + " / " + DISC.frames;
+    infoAngle.textContent = (DISC.index * 360 / DISC.frames) + "°";
+    infoAuto.textContent = autoRotation ? "an" : "aus";
+  }
+
+  // lädt ein Sprite-Sheet über ein Image-Objekt und setzt es erst danach als src des <img>
+  function loadSheet(s) {
+    return new Promise(function (resolve, reject) {
+      const loader = new Image();
+      loader.onload = function () {
+        s.img.src = loader.src;
+        s.img.decode().catch(function () {}).then(function () {
+          s.ready = true;
+          showFrame(s, 0);
+          s.sprite.classList.add("is-loaded");
+          resolve();
+        });
+      };
+      loader.onerror = function () {
+        s.sprite.classList.add("is-failed");
+        reject(new Error(s.src));
+      };
+      loader.src = s.src;
+    });
+  }
+
+  function stepDisc(direction) {
+    if (!DISC.ready) return;
+    showFrame(DISC, DISC.index + direction);
+    updateInfo();
+  }
+
+  function setAutoRotation(on) {
+    if (!DISC.ready) return;
+    autoRotation = on;
+    DISC.acc = 0;
+    btnAutoLabel.textContent = on ? "Auto-Rotation stoppen" : "Auto-Rotation starten";
+    setStatus(on ? "Auto-Rotation läuft (nach rechts). Mit a oder dem Button anhalten." : "Auto-Rotation angehalten.", "ready");
+    updateInfo();
+  }
+
+  // Animationsschleife: feste Bildrate unabhängig von der Bildwiederholrate des Monitors
+  let lastTime = performance.now();
+  function advance(s, dt) {
+    if (!s.ready) return;
+    const msPerFrame = 1000 / s.fps;
+    s.acc += dt;
+    let n = 0;
+    while (s.acc >= msPerFrame) { s.acc -= msPerFrame; n++; }
+    if (n > 0) showFrame(s, s.index + n);
+  }
+  function loop(now) {
+    const dt = Math.min(now - lastTime, 100); // nach Tab-Wechsel keine Sprünge
+    lastTime = now;
+    if (!BUNNY.paused) advance(BUNNY, dt);
+    if (autoRotation) {
+      advance(DISC, dt);
+      updateInfo();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // Interaktion: Buttons
+  btnLeft.addEventListener("click", function () { stepDisc(-1); });
+  btnRight.addEventListener("click", function () { stepDisc(+1); });
+  btnAuto.addEventListener("click", function () { setAutoRotation(!autoRotation); });
+  btnBunny.addEventListener("click", function () {
+    BUNNY.paused = !BUNNY.paused;
+    BUNNY.acc = 0;
+    btnBunnyLabel.textContent = BUNNY.paused ? "Hase starten" : "Hase anhalten";
+  });
+
+  // Interaktion: Tasten l, r, a (ein Tastendruck = ein Schritt, kein Auto-Repeat)
+  function flash(btn) {
+    btn.classList.add("is-pressed");
+    setTimeout(function () { btn.classList.remove("is-pressed"); }, 120);
+  }
+  window.addEventListener("keydown", function (evt) {
+    if (!DISC.ready || evt.ctrlKey || evt.metaKey || evt.altKey || evt.repeat) return;
+    switch ((evt.key || "").toLowerCase()) {
+      case "l": flash(btnLeft); stepDisc(-1); break;
+      case "r": flash(btnRight); stepDisc(+1); break;
+      case "a": flash(btnAuto); setAutoRotation(!autoRotation); break;
+    }
+  });
+
+  // Start
+  loadSheet(DISC).then(function () {
+    updateInfo();
+    btnLeft.disabled = btnRight.disabled = btnAuto.disabled = false;
+    setStatus("Bereit. Mit l, r oder a (bzw. den Buttons) steuern.", "ready");
+  }).catch(function (err) {
+    console.error("Scheibe konnte nicht geladen werden:", err);
+    setStatus("Fehler: Das Bild der Scheibe (" + err.message + ") konnte nicht geladen werden.", "error");
+  });
+  loadSheet(BUNNY).then(function () {
+    btnBunny.disabled = false;
+  }).catch(function (err) {
+    console.error("Hase konnte nicht geladen werden:", err);
+    setStatus("Fehler: Das Bild des Hasen (" + err.message + ") konnte nicht geladen werden.", "error");
+  });
+  requestAnimationFrame(loop);
+})();
+// END EA1_INTERAKTIV_ANIMIERTE_SCHEIBE
+
+// Hilfe-Popover
+document.querySelectorAll(".help").forEach(help => {
+  const btn = help.querySelector(".help-btn");
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    document.querySelectorAll(".help.is-open").forEach(h => { if (h !== help) { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); } });
+    const open = help.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+});
+document.addEventListener("click", e => { if (!e.target.closest(".help")) document.querySelectorAll(".help.is-open").forEach(h => { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); }); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".help.is-open").forEach(h => { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); }); });
+</script>
+</body>
+</html>
